@@ -1,8 +1,13 @@
-
-name: 展讯UMS312完整签名(自动识别)
+name: 展讯UMS312完整签名(支持URL下载)
 
 on:
   workflow_dispatch:
+    inputs:
+      boot_url:
+        description: 'boot.img 下载链接（直链）'
+        required: true
+        type: string
+        default: ''
 
 jobs:
   sign:
@@ -13,26 +18,39 @@ jobs:
       - name: 安装依赖
         run: |
           sudo apt update
-          sudo apt install -y python3 python3-cryptography gcc git
-          git clone https://github.com/android/platform-external_avb avb
+          sudo apt install -y python3 python3-cryptography gcc wget
+
+      - name: 克隆 AVB 工具
+        run: |
+          git clone https://github.com/android/platform-external_avb.git avb
+
+      - name: 克隆展讯工具
+        run: |
           git clone https://github.com/affggh/sprd-tools.git sprd
+
+      - name: 编译 imgheaderinsert
+        run: |
           cd sprd/imgheaderinsert
           gcc -o imgheaderinsert imgheaderinsert.c
           sudo cp imgheaderinsert /usr/bin
+          cd ../..
 
-      - name: 自动查找并签名boot
+      - name: 下载 boot.img
         run: |
-          # 自动找 .img 文件（排除输出文件）
-          INPUT=$(ls *.img 2>/dev/null | grep -v boot_signed | head -n1)
-          if [ -z "$INPUT" ]; then
-            echo "❌ 找不到 .img 文件"
+          echo "下载地址: ${{ github.event.inputs.boot_url }}"
+          wget -O boot.img "${{ github.event.inputs.boot_url }}"
+          if [ ! -f boot.img ]; then
+            echo "❌ 下载失败"
             exit 1
           fi
-          echo "✅ 签名文件: $INPUT"
+          echo "✅ 下载成功，文件大小:"
+          ls -lh boot.img
 
+      - name: 签名boot
+        run: |
           # AVB footer 签名
           python3 avb/avbtool.py add_hash_footer \
-            --image $INPUT \
+            --image boot.img \
             --partition_name boot \
             --algorithm SHA256_RSA2048 \
             --key avb/test/data/rsa2048.pem \
