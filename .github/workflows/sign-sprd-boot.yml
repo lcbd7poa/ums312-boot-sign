@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       boot_url:
-        description: "输入 boot.img 直链"
+        description: 'boot.img 下载链接（直链）'
         required: true
         type: string
 
@@ -12,46 +12,31 @@ jobs:
   sign:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
       - name: 安装依赖
         run: |
           sudo apt update
           sudo apt install -y python3 python3-pip gcc wget unzip
-          pip3 install pycryptodome
+          pip3 install avb pycryptodome
 
-      - name: 下载 AVB 工具
+      - name: 下载展讯工具
         run: |
-          wget https://github.com/android/platform-external_avb/archive/refs/heads/master.zip -O avb.zip
-          unzip -q avb.zip
-          mv platform-external_avb-master avb
-
-      - name: 下载 sprd-tools 工具
-        run: |
-          wget https://github.com/affggh/sprd-tools/archive/refs/heads/main.zip -O sprd.zip
-          unzip -q sprd.zip
-          mv sprd-tools-main sprd
-
-      - name: 编译 imgheaderinsert
-        run: |
-          cd sprd/imgheaderinsert
+          git clone https://github.com/affggh/sprd-tools.git
+          cd sprd-tools/imgheaderinsert
           gcc -o imgheaderinsert imgheaderinsert.c
-          sudo cp imgheaderinsert /usr/local/bin
-          cd ../..
+          sudo cp imgheaderinsert /usr/local/bin/
 
-      - name: 下载 Boot 镜像
+      - name: 下载 boot.img
         run: |
           wget -O boot.img "${{ github.event.inputs.boot_url }}"
           ls -lh boot.img
 
-      - name: 执行 Legacy 签名 (展讯 0x200)
+      - name: 签名boot
         run: |
-          python3 avb/avbtool.py add_hash_footer \
+          avb add_hash_footer \
             --image boot.img \
             --partition_name boot \
             --algorithm SHA256_RSA2048 \
-            --key avb/test/data/rsa2048.pem \
+            --key /usr/local/lib/python3.*/dist-packages/avb/test/data/rsa2048.pem \
             --output boot_signed_avb.img
 
           imgheaderinsert boot_signed_avb.img boot_signed_final.img 0x200
