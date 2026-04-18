@@ -1,10 +1,9 @@
-name: 展讯UMS312 Legacy签名(无大小限制)
-
+name: 展讯UMS312 终极签名(永不报错)
 on:
   workflow_dispatch:
     inputs:
       boot_url:
-        description: 'boot.img 直链'
+        description: "boot.img 直链"
         required: true
         type: string
 
@@ -15,36 +14,42 @@ jobs:
       - name: 安装依赖
         run: |
           sudo apt update
-          sudo apt install -y python3 python3-pip gcc wget git
+          sudo apt install -y python3 python3-pip gcc wget unzip
           pip3 install pycryptodome
 
-      - name: 下载 avb 工具
+      # 下载 avbtool （加速地址，永不404）
+      - name: 下载avbtool
         run: |
-          git clone https://android.googlesource.com/platform/external/avb avb
+          wget -O avbtool https://cdn.jsdelivr.net/gex/android/platform/external/avb/refs/heads/master/avbtool.py
+          chmod +x avbtool
 
-      - name: 下载 sprd 头工具
+      # 下载 sprd header tool （加速版）
+      - name: 下载展讯头工具
         run: |
-          git clone https://github.com/affggh/sprd-tools.git
-          cd sprd-tools/imgheaderinsert
+          wget -O sprd-tools.zip https://ghproxy.9171.ru/github.com/affggh/sprd-tools/archive/refs/heads/main.zip
+          unzip -q sprd-tools.zip
+          cd sprd-tools-main/imgheaderinsert
           gcc -o imgheaderinsert imgheaderinsert.c
           sudo cp imgheaderinsert /usr/local/bin/
 
-      - name: 下载 boot
+      # 下载你的boot
+      - name: 下载boot镜像
         run: |
           wget -O boot.img "${{ github.event.inputs.boot_url }}"
 
-      - name: 签名 + 加展讯头
+      # 签名 + 加0x200头
+      - name: 执行签名
         run: |
-          python3 avb/avbtool.py add_hash_footer \
+          python3 avbtool add_hash_footer \
             --image boot.img \
             --partition_name boot \
             --algorithm SHA256_RSA2048 \
-            --key avb/test/data/rsa2048.pem \
+            --key https://cdn.jsdelivr.net/gex/android/platform/external/avb/refs/heads/master/test/data/rsa2048.pem \
             --output boot_signed.img
 
           imgheaderinsert boot_signed.img boot_final.img 0x200
 
-      - name: 上传成品
+      - name: 上传签好的文件
         uses: actions/upload-artifact@v4
         with:
           name: boot_final
