@@ -1,10 +1,10 @@
-name: 展讯UMS312 完整签名(URL直链)
+name: 展讯UMS312 Legacy签名(无大小限制)
 
 on:
   workflow_dispatch:
     inputs:
       boot_url:
-        description: 'boot.img 下载链接（直链）'
+        description: 'boot.img 直链'
         required: true
         type: string
 
@@ -15,34 +15,37 @@ jobs:
       - name: 安装依赖
         run: |
           sudo apt update
-          sudo apt install -y python3 python3-pip gcc wget unzip
-          pip3 install avb pycryptodome
+          sudo apt install -y python3 python3-pip gcc wget git
+          pip3 install pycryptodome
 
-      - name: 下载展讯工具
+      - name: 下载 avb 工具
+        run: |
+          git clone https://android.googlesource.com/platform/external/avb avb
+
+      - name: 下载 sprd 头工具
         run: |
           git clone https://github.com/affggh/sprd-tools.git
           cd sprd-tools/imgheaderinsert
           gcc -o imgheaderinsert imgheaderinsert.c
           sudo cp imgheaderinsert /usr/local/bin/
 
-      - name: 下载 boot.img
+      - name: 下载 boot
         run: |
           wget -O boot.img "${{ github.event.inputs.boot_url }}"
-          ls -lh boot.img
 
-      - name: 签名boot
+      - name: 签名 + 加展讯头
         run: |
-          avb add_hash_footer \
+          python3 avb/avbtool.py add_hash_footer \
             --image boot.img \
             --partition_name boot \
             --algorithm SHA256_RSA2048 \
-            --key /usr/local/lib/python3.*/dist-packages/avb/test/data/rsa2048.pem \
-            --output boot_signed_avb.img
+            --key avb/test/data/rsa2048.pem \
+            --output boot_signed.img
 
-          imgheaderinsert boot_signed_avb.img boot_signed_final.img 0x200
+          imgheaderinsert boot_signed.img boot_final.img 0x200
 
-      - name: 上传签好的文件
+      - name: 上传成品
         uses: actions/upload-artifact@v4
         with:
-          name: boot_signed_final
-          path: boot_signed_final.img
+          name: boot_final
+          path: boot_final.img
