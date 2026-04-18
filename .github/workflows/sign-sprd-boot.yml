@@ -1,10 +1,10 @@
-name: 展讯UMS312完整签名(支持URL下载)
+name: 展讯UMS312 完整签名(URL直链)
 
 on:
   workflow_dispatch:
     inputs:
       boot_url:
-        description: 'boot.img 下载链接（直链）'
+        description: "输入 boot.img 直链"
         required: true
         type: string
 
@@ -12,42 +12,40 @@ jobs:
   sign:
     runs-on: ubuntu-latest
     steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
       - name: 安装依赖
         run: |
           sudo apt update
-          sudo apt install -y python3 python3-cryptography gcc wget unzip
+          sudo apt install -y python3 python3-pip gcc wget unzip
+          pip3 install pycryptodome
 
-      - name: 下载并解压 AVB 工具
+      - name: 下载 AVB 工具
         run: |
           wget https://github.com/android/platform-external_avb/archive/refs/heads/master.zip -O avb.zip
-          unzip avb.zip
+          unzip -q avb.zip
           mv platform-external_avb-master avb
 
-      - name: 下载并解压展讯工具
+      - name: 下载 sprd-tools 工具
         run: |
           wget https://github.com/affggh/sprd-tools/archive/refs/heads/main.zip -O sprd.zip
-          unzip sprd.zip
+          unzip -q sprd.zip
           mv sprd-tools-main sprd
 
       - name: 编译 imgheaderinsert
         run: |
           cd sprd/imgheaderinsert
           gcc -o imgheaderinsert imgheaderinsert.c
-          sudo cp imgheaderinsert /usr/bin
+          sudo cp imgheaderinsert /usr/local/bin
           cd ../..
 
-      - name: 下载 boot.img
+      - name: 下载 Boot 镜像
         run: |
-          echo "下载地址: ${{ github.event.inputs.boot_url }}"
           wget -O boot.img "${{ github.event.inputs.boot_url }}"
-          if [ ! -f boot.img ]; then
-            echo "❌ 下载失败"
-            exit 1
-          fi
-          echo "✅ 下载成功，文件大小:"
           ls -lh boot.img
 
-      - name: 签名boot
+      - name: 执行 Legacy 签名 (展讯 0x200)
         run: |
           python3 avb/avbtool.py add_hash_footer \
             --image boot.img \
@@ -58,9 +56,7 @@ jobs:
 
           imgheaderinsert boot_signed_avb.img boot_signed_final.img 0x200
 
-          echo "✅ 签名完成: boot_signed_final.img"
-
-      - name: 上传签好的boot
+      - name: 上传签好的文件
         uses: actions/upload-artifact@v4
         with:
           name: boot_signed_final
