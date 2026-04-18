@@ -7,26 +7,27 @@ on:
         description: 'boot.img 下载链接（直链）'
         required: true
         type: string
-        default: ''
 
 jobs:
   sign:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-
       - name: 安装依赖
         run: |
           sudo apt update
-          sudo apt install -y python3 python3-cryptography gcc wget
+          sudo apt install -y python3 python3-cryptography gcc wget unzip
 
-      - name: 克隆 AVB 工具
+      - name: 下载并解压 AVB 工具（不用 git）
         run: |
-          git clone https://github.com/android/platform-external_avb.git avb
+          wget https://github.com/android/platform-external_avb/archive/refs/heads/main.zip -O avb.zip
+          unzip avb.zip
+          mv platform-external_avb-main avb
 
-      - name: 克隆展讯工具
+      - name: 下载并解压展讯工具（不用 git）
         run: |
-          git clone https://github.com/affggh/sprd-tools.git sprd
+          wget https://github.com/affggh/sprd-tools/archive/refs/heads/master.zip -O sprd.zip
+          unzip sprd.zip
+          mv sprd-tools-master sprd
 
       - name: 编译 imgheaderinsert
         run: |
